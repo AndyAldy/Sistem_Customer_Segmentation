@@ -79,9 +79,9 @@ export default function App() {
   });
 
   const getFilterLabel = () => {
-    if (selectedCluster === '0') return 'Klaster 1';
-    if (selectedCluster === '1') return 'Klaster 2';
-    if (selectedCluster === '2') return 'Klaster 3';
+    if (selectedCluster === '0') return 'High Value';
+    if (selectedCluster === '1') return 'Medium Value';
+    if (selectedCluster === '2') return 'Low Value';
     return 'Semua Data';
   };
 
