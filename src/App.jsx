@@ -1,28 +1,29 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { Play, Plus, Edit3, Trash2, Disc, User, Activity } from 'lucide-react';
+// eslint-disable-next-line no-unused-vars
+import React, { useState, useEffect, useCallback } from 'react';
+import axiosInstance from 'axios';
+import { Play, Plus, Edit3, Trash2, Disc, User, Activity, Filter, ChevronDown } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
 
 export default function App() {
   const [customers, setCustomers] = useState([]);
-  const [formData, setFormData] = useState({ name: '', income: '', recency: '', mnt_wines: '', mnt_meat: '' });
+  const [formData, setFormData] = useState({ income: '', recency: '', mnt_wines: '', mnt_meat: '' });
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  
+  const [selectedCluster, setSelectedCluster] = useState('all');
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_URL}/customers`);
+      const res = await axiosInstance.get(`${API_URL}/customers`);
       setCustomers(res.data);
     } catch (err) {
       console.error(err);
     }
   }, []);
 
-  useEffect(() => { 
-    fetchData(); 
-  }, [fetchData]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,11 +32,11 @@ export default function App() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (isEditing) {
-      await axios.put(`${API_URL}/customers/${editId}`, formData);
+      await axiosInstance.put(`${API_URL}/customers/${editId}`, formData);
     } else {
-      await axios.post(`${API_URL}/customers`, formData);
+      await axiosInstance.post(`${API_URL}/customers`, formData);
     }
-    setFormData({ name: '', income: '', recency: '', mnt_wines: '', mnt_meat: '' });
+    setFormData({ income: '', recency: '', mnt_wines: '', mnt_meat: '' });
     setIsEditing(false);
     setEditId(null);
     fetchData();
@@ -43,43 +44,55 @@ export default function App() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Yakin ingin menghapus data pelanggan ini?')) {
-      await axios.delete(`${API_URL}/customers/${id}`);
+      await axiosInstance.delete(`${API_URL}/customers/${id}`);
       fetchData();
     }
   };
 
   const handleEdit = (cust) => {
-    setFormData({ name: cust.name, income: cust.income, recency: cust.recency, mnt_wines: cust.mnt_wines, mnt_meat: cust.mnt_meat });
+    setFormData({ income: cust.Income, recency: cust.Recency, mnt_wines: cust.MntWines, mnt_meat: cust.MntMeatProducts });
     setIsEditing(true);
-    setEditId(cust.id);
+    setEditId(cust.ID);
   };
 
   const runKMeans = async () => {
     try {
-      await axios.post(`${API_URL}/run-kmeans`);
+      await axiosInstance.post(`${API_URL}/run-kmeans`);
       fetchData();
-      alert("Berhasil! Data pelanggan telah disegmentasi.");
-    } catch {
-      alert('Gagal menjalankan K-Means. Pastikan ada minimal 3 data pelanggan.');
+      alert("Berhasil! Data pelanggan telah disegmentasi berdasarkan CSV.");
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      alert('Gagal menjalankan K-Means.');
     }
   };
 
   const getClusterBadge = (cluster) => {
-    if (cluster === 0) return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30'; 
-    if (cluster === 1) return 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30'; 
-    if (cluster === 2) return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30'; 
-    return 'text-zinc-400 bg-zinc-800 border-zinc-700'; 
+    if (cluster === 0) return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30';
+    if (cluster === 1) return 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30';
+    if (cluster === 2) return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30';
+    return 'text-zinc-400 bg-zinc-800 border-zinc-700';
+  };
+
+  const displayedCustomers = customers.filter(cust => {
+    if (selectedCluster === 'all') return true;
+    return cust.cluster === parseInt(selectedCluster);
+  });
+
+  const getFilterLabel = () => {
+    if (selectedCluster === '0') return 'Klaster 1';
+    if (selectedCluster === '1') return 'Klaster 2';
+    if (selectedCluster === '2') return 'Klaster 3';
+    return 'Semua Data';
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-fuchsia-500/30 text-left">
-      
-      {/* HEADER HERO (Ala Banner Spotify) */}
+
+      {/* HEADER HERO */}
       <div className="relative h-[350px] w-full flex items-end pb-12 px-6 md:px-16 overflow-hidden bg-gradient-to-b from-[#1c102c] to-[#0a0a0a]">
-        {/* Glow Effects */}
         <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-fuchsia-600/30 blur-[150px] rounded-full pointer-events-none"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-cyan-600/20 blur-[120px] rounded-full pointer-events-none"></div>
-        
+
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 w-full max-w-7xl mx-auto">
           <div className="w-32 h-32 md:w-48 md:h-48 rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-600 to-cyan-500 shadow-2xl shadow-fuchsia-500/30 flex items-center justify-center flex-shrink-0">
             <Activity size={72} className="text-white drop-shadow-md" />
@@ -97,32 +110,100 @@ export default function App() {
       </div>
 
       <div className="px-6 md:px-16 pb-24 pt-4 max-w-7xl mx-auto">
-        
-        {/* ACTION BAR */}
+
         <div className="flex items-center gap-5 py-6 mb-4">
-          <button 
+          <button
             onClick={runKMeans}
-            className="w-16 h-16 bg-fuchsia-500 hover:bg-fuchsia-400 hover:scale-105 active:scale-95 transition-all rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(217,70,239,0.4)] text-black"
+            className="w-16 h-16 cursor-pointer hover:cursor-pointer active:cursor-grabbing bg-fuchsia-500 hover:bg-fuchsia-400 hover:scale-105 active:scale-95 transition-all rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(217,70,239,0.4)] text-black"
             title="Jalankan Algoritma K-Means"
           >
             <Play size={32} className="ml-1" fill="currentColor" />
           </button>
           <div>
             <h3 className="text-xl font-bold text-white">Proses Data</h3>
-            <p className="text-sm text-zinc-500 font-medium">Klik untuk menjalankan clustering</p>
+            <p className="text-sm text-zinc-500 font-medium">Klik untuk memproses dataset CSV</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* TRACKLIST (TABEL DATA) */}
+
+          {/* TABEL DATA */}
           <div className="lg:col-span-8 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2 border-b border-zinc-800/80 pb-4 text-zinc-100">
-              <Disc className="text-cyan-400" size={20} /> Dataset Pelanggan
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="text-zinc-500 border-b border-zinc-800/80 uppercase tracking-wider text-xs">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-zinc-800/80 pb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100">
+                <Disc className="text-cyan-400" size={20} /> Dataset Pelanggan
+              </h2>
+              
+              {/* DROPDOWN MENU */}
+              <div className="relative group z-30">
+                {/* Tombol Utama - Efek Grab ditambahkan di sini */}
+                <button className="flex items-center gap-2 cursor-pointer hover:cursor-grab active:cursor-grabbing bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md">
+                  <Filter size={16} className="text-zinc-400" />
+                  {getFilterLabel()}
+                  <ChevronDown size={16} className="text-zinc-500 group-hover:rotate-180 transition-transform duration-300 ml-1" />
+                </button>
+
+                {/* Kotak Dropdown */}
+                <div className="absolute right-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-zinc-800/80 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 translate-y-2 transition-all duration-300 overflow-hidden backdrop-blur-xl">
+                  <div className="p-1.5 flex flex-col gap-1">
+                    
+                    <button 
+                      onClick={() => setSelectedCluster('all')}
+                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
+                        selectedCluster === 'all' 
+                          ? 'bg-zinc-800 text-white' 
+                          : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${selectedCluster === 'all' ? 'bg-white' : 'bg-transparent'}`}></div> 
+                      Semua Data
+                    </button>
+
+                    <button 
+                      onClick={() => setSelectedCluster('0')}
+                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
+                        selectedCluster === '0' 
+                          ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' 
+                          : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'
+                      }`}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
+                      Klaster 1
+                    </button>
+
+                    <button 
+                      onClick={() => setSelectedCluster('1')}
+                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
+                        selectedCluster === '1' 
+                          ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
+                          : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'
+                      }`}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
+                      Klaster 2
+                    </button>
+
+                    <button 
+                      onClick={() => setSelectedCluster('2')}
+                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
+                        selectedCluster === '2' 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'
+                      }`}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
+                      Klaster 3
+                    </button>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="w-full text-left text-sm whitespace-nowrap relative">
+                <thead className="text-zinc-500 border-b border-zinc-800/80 uppercase tracking-wider text-xs sticky top-0 bg-[#161616] z-10">
                   <tr>
                     <th className="pb-4 px-2 font-medium">#</th>
                     <th className="pb-4 px-2 font-medium">Pelanggan</th>
@@ -133,20 +214,20 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
-                  {customers.map((cust, index) => (
-                    <tr key={cust.id} className="hover:bg-zinc-800/40 transition-colors group">
+                  {displayedCustomers.map((cust, index) => (
+                    <tr key={cust.ID} className="hover:bg-zinc-800/40 transition-colors group">
                       <td className="py-4 px-2 text-zinc-500 font-mono text-xs">{index + 1}</td>
                       <td className="py-4 px-2 font-semibold text-zinc-200 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0">
                           <User size={16} className="text-zinc-400" />
                         </div>
-                        {cust.name}
+                        ID #{cust.ID}
                       </td>
                       <td className="py-4 px-2 text-zinc-400">
-                        <span className="text-zinc-100 font-medium">${cust.income}</span> <span className="text-zinc-600 mx-1">/</span> {cust.recency} hari
+                        <span className="text-zinc-100 font-medium">${cust.Income || 0}</span> <span className="text-zinc-600 mx-1">/</span> {cust.Recency || 0} hari
                       </td>
                       <td className="py-4 px-2 text-zinc-400">
-                         🍷 <span className="text-zinc-100">${cust.mnt_wines}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.mnt_meat}</span>
+                         🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
                       </td>
                       <td className="py-4 px-2">
                         {cust.cluster !== null ? (
@@ -158,19 +239,19 @@ export default function App() {
                         )}
                       </td>
                       <td className="py-4 px-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEdit(cust)} className="p-2 text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
+                        <button onClick={() => handleEdit(cust)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
                           <Edit3 size={18} />
                         </button>
-                        <button onClick={() => handleDelete(cust.id)} className="p-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
+                        <button onClick={() => handleDelete(cust.ID)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
                           <Trash2 size={18} />
                         </button>
                       </td>
                     </tr>
                   ))}
-                  {customers.length === 0 && (
+                  {displayedCustomers.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="py-12 text-center text-zinc-500">
-                        Belum ada data pelanggan di database.
+                      <td colSpan="6" className="py-12 text-center text-zinc-500 italic">
+                        Tidak ada data di klaster ini.
                       </td>
                     </tr>
                   )}
@@ -179,18 +260,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* FORM PANEL (Glassmorphism) */}
+          {/* FORM PANEL */}
           <div className="lg:col-span-4 sticky top-6">
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800/80 p-6 shadow-2xl">
               <h2 className="text-lg font-bold mb-6 flex items-center gap-2 border-b border-zinc-800/80 pb-4 text-zinc-100">
-                <Plus className="text-fuchsia-400" size={20} /> {isEditing ? 'Edit Data Pelanggan' : 'Tambah Pelanggan'}
+                <Plus className="text-fuchsia-400" size={20} /> {isEditing ? 'Edit Data Pelanggan' : 'Tambah Baru'}
               </h2>
               <form onSubmit={handleSave} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Nama Lengkap</label>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} required
-                    className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500 transition-all placeholder:text-zinc-700" placeholder="Contoh: John Doe" />
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Pendapatan ($)</label>
@@ -216,12 +292,12 @@ export default function App() {
                   </div>
                 </div>
                 <div className="pt-2">
-                  <button type="submit" className="w-full bg-white text-black hover:bg-zinc-200 px-4 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
-                    {isEditing ? 'Simpan Perubahan' : 'Tambahkan Data'}
+                  <button type="submit" className="w-full cursor-pointer hover:cursor-pointer active:cursor-grabbing bg-white text-black hover:bg-zinc-200 px-4 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
+                    {isEditing ? 'Simpan Perubahan' : 'Tambahkan ke Database'}
                   </button>
                   {isEditing && (
-                    <button type="button" onClick={() => { setIsEditing(false); setFormData({ name: '', income: '', recency: '', mnt_wines: '', mnt_meat: '' }) }} 
-                      className="w-full bg-transparent border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 px-4 py-3 rounded-xl font-semibold transition-all mt-3">
+                    <button type="button" onClick={() => { setIsEditing(false); setFormData({ income: '', recency: '', mnt_wines: '', mnt_meat: '' }) }}
+                      className="w-full cursor-pointer hover:cursor-pointer bg-transparent border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 px-4 py-3 rounded-xl font-semibold transition-all mt-3">
                       Batal
                     </button>
                   )}
