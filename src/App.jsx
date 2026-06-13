@@ -73,16 +73,25 @@ export default function App() {
     return 'text-zinc-400 bg-zinc-800 border-zinc-700';
   };
 
+  // FUNGSI BARU: Menentukan nama spesifik untuk masing-masing klaster di tabel
+  const getClusterName = (cluster) => {
+    if (cluster === 0) return '💎 Prioritas (High Value)';
+    if (cluster === 1) return '⭐ Reguler (Medium Value)';
+    if (cluster === 2) return '⚠️ Pasif (Low Value)';
+    return 'Belum Diolah';
+  };
+
   const displayedCustomers = customers.filter(cust => {
     if (selectedCluster === 'all') return true;
     return cust.cluster === parseInt(selectedCluster);
   });
 
+  // MENYESUAIKAN LABEL FILTER DENGAN NAMA SPESIFIK
   const getFilterLabel = () => {
-    if (selectedCluster === '0') return 'High Value';
-    if (selectedCluster === '1') return 'Medium Value';
-    if (selectedCluster === '2') return 'Low Value';
-    return 'Semua Data';
+    if (selectedCluster === '0') return '💎 Prioritas';
+    if (selectedCluster === '1') return '⭐ Reguler';
+    if (selectedCluster === '2') return '⚠️ Pasif';
+    return 'Semua Segmentasi';
   };
 
   return (
@@ -137,15 +146,13 @@ export default function App() {
               
               {/* DROPDOWN MENU */}
               <div className="relative group z-30">
-                {/* Tombol Utama - Efek Grab ditambahkan di sini */}
                 <button className="flex items-center gap-2 cursor-pointer hover:cursor-grab active:cursor-grabbing bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md">
                   <Filter size={16} className="text-zinc-400" />
                   {getFilterLabel()}
                   <ChevronDown size={16} className="text-zinc-500 group-hover:rotate-180 transition-transform duration-300 ml-1" />
                 </button>
 
-                {/* Kotak Dropdown */}
-                <div className="absolute right-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-zinc-800/80 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 translate-y-2 transition-all duration-300 overflow-hidden backdrop-blur-xl">
+                <div className="absolute right-0 top-full mt-2 w-60 bg-[#1a1a1a] border border-zinc-800/80 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 translate-y-2 transition-all duration-300 overflow-hidden backdrop-blur-xl">
                   <div className="p-1.5 flex flex-col gap-1">
                     
                     <button 
@@ -157,7 +164,7 @@ export default function App() {
                       }`}
                     >
                       <div className={`w-2 h-2 rounded-full ${selectedCluster === 'all' ? 'bg-white' : 'bg-transparent'}`}></div> 
-                      Semua Data
+                      Semua Segmentasi
                     </button>
 
                     <button 
@@ -169,7 +176,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
-                      High Value
+                      💎 Prioritas (High Value)
                     </button>
 
                     <button 
@@ -181,7 +188,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
-                      Medium Value
+                      ⭐ Reguler (Medium Value)
                     </button>
 
                     <button 
@@ -193,7 +200,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
-                      Low Value
+                      ⚠️ Pasif (Low Value)
                     </button>
 
                   </div>
@@ -209,7 +216,7 @@ export default function App() {
                     <th className="pb-4 px-2 font-medium">Pelanggan</th>
                     <th className="pb-4 px-2 font-medium">Income & Recency</th>
                     <th className="pb-4 px-2 font-medium">Pengeluaran</th>
-                    <th className="pb-4 px-2 font-medium">Segmentasi</th>
+                    <th className="pb-4 px-2 font-medium">Segmentasi Spesifik</th>
                     <th className="pb-4 px-2 font-medium text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -232,7 +239,7 @@ export default function App() {
                       <td className="py-4 px-2">
                         {cust.cluster !== null ? (
                           <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust.cluster)}`}>
-                            Klaster {cust.cluster + 1}
+                            {getClusterName(cust.cluster)}
                           </span>
                         ) : (
                           <span className="text-zinc-600 text-xs italic bg-zinc-800 px-3 py-1 rounded-full">Belum Diolah</span>
