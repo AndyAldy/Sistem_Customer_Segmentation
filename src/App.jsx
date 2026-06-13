@@ -169,7 +169,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
-                      Klaster 1
+                      High Value
                     </button>
 
                     <button 
@@ -181,7 +181,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
-                      Klaster 2
+                      Medium Value
                     </button>
 
                     <button 
@@ -193,7 +193,7 @@ export default function App() {
                       }`}
                     >
                       <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
-                      Klaster 3
+                      Low Value
                     </button>
 
                   </div>
