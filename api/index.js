@@ -55,7 +55,6 @@ app.post('/api/run-kmeans', async (req, res) => {
 
     const { data, error } = await supabase
         .from('customers')
-        .order('ID', { ascending: false })
         .select('*')
         .limit(2500);
 
