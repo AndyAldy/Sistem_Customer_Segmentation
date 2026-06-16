@@ -99,7 +99,7 @@ export default function App() {
     return 'Belum Diolah';
   };
 
-  const displayedCustomers = customers.filter(cust => {
+const displayedCustomers = customers.filter(cust => {
     if (selectedCluster === 'all') return true;
     return determineCategory(cust) === selectedCluster;
   });
