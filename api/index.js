@@ -124,39 +124,20 @@ app.post('/api/run-kmeans', async (req, res) => {
 
 
 
-let updateError = null;
+const { error: upsertError } = await supabase
+            .from('customers')
+            .upsert(updates, { onConflict: 'ID' });
 
+        if (upsertError) {
+            console.error("Upsert Error:", upsertError);
+            return res.status(500).json(upsertError);
+        }
 
-for (const item of updates) {
-
-    const { error } = await supabase
-        .from('customers')
-        .update({
-            cluster: item.cluster
-        })
-        .eq('ID', item.ID);
-
-
-    if(error){
-        updateError = error;
-        break;
-    }
-
-}
-
-
-if(updateError){
-    return res.status(500).json(updateError);
-}
         res.json({
-            message:"KMeans selesai",
-            total:updates.length
+            message: "KMeans selesai",
+            total: updates.length
         });
-
-
     });
-
-
 });
 app.post('/api/reset-cluster', async(req,res)=>{
 
