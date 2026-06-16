@@ -20,7 +20,7 @@ app.get('/api/customers', async (req, res) => {
         .from('customers')
         .select('*')
         .order('ID', { ascending: false })
-        .limit(5000);
+        .select('*', { count: 'exact', head: true });
 
     if (error) {
         return res.status(500).json(error);
@@ -51,53 +51,121 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 app.post('/api/run-kmeans', async (req, res) => {
-    // Ambil data (Dibatasi 1000 agar tidak memberatkan memori algoritma)
+
     const { data, error } = await supabase
         .from('customers')
-        .select('*')
-        .limit(5000);
+        .select('*');
 
-    if (error) return res.status(500).json(error);
-    if (!data || data.length < 3) return res.status(400).json({ message: 'Minimal butuh 3 data untuk K-Means' });
 
-    // Siapkan array data K-Means
-    let vectors = data.map(item => [
-        parseFloat(item.Income) || 0,
-        parseFloat(item.Recency) || 0,
-        parseFloat(item.MntWines) || 0,
-        parseFloat(item.MntMeatProducts) || 0
+    if(error)
+        return res.status(500).json(error);
+
+
+    if(!data || data.length < 3)
+        return res.status(400).json({
+            message:"Minimal 3 data"
+        });
+
+
+
+    const vectors = data.map(item => [
+
+        Number(item.Income) || 0,
+        Number(item.Recency) || 0,
+        Number(item.MntWines) || 0,
+        Number(item.MntMeatProducts) || 0
+
     ]);
 
-    kmeans.clusterize(vectors, { k: 3 }, async (err, result) => {
-        if (err) return res.status(500).json(err);
 
-        try {
-            // Siapkan wadah kosong untuk menampung data yang sudah diolah
-            let bulkUpdates = [];
-            
-            result.forEach((clusterObj, clusterIndex) => {
-                clusterObj.clusterInd.forEach(dataIndex => {
-                    // Salin data lama, lalu timpa bagian 'cluster'-nya saja
-                    bulkUpdates.push({
-                        ...data[dataIndex],
-                        cluster: clusterIndex 
-                    });
+
+    kmeans.clusterize(
+        vectors,
+        { k:3 },
+
+        async(err,result)=>{
+
+        if(err)
+            return res.status(500).json(err);
+
+
+
+        let updates = [];
+
+
+
+        result.forEach((cluster)=>{
+
+
+            cluster.clusterInd.forEach(index=>{
+
+
+                updates.push({
+
+                    ID:data[index].ID,
+
+                    Income:data[index].Income,
+
+                    Recency:data[index].Recency,
+
+                    MntWines:data[index].MntWines,
+
+                    MntMeatProducts:data[index].MntMeatProducts,
+
+                    cluster:result.indexOf(cluster)
+
                 });
+
+
             });
 
-            // Lakukan UPSERT (Update massal) dalam SATU KALI kirim ke Supabase!
-            const { error: upsertError } = await supabase
-                .from('customers')
-                .upsert(bulkUpdates);
 
-            if (upsertError) throw upsertError;
+        });
 
-            res.json({ message: 'Proses K-Means selesai! Segmentasi berhasil.' });
-        } catch (updateError) {
-            console.error("Error K-Means:", updateError);
-            res.status(500).json({ message: 'Gagal mengupdate cluster', error: updateError });
-        }
+
+
+        const {error:updateError} =
+        await supabase
+        .from('customers')
+        .upsert(updates,{
+            onConflict:'ID'
+        });
+
+
+
+        if(updateError)
+            return res.status(500).json(updateError);
+
+
+
+        res.json({
+            message:"KMeans selesai",
+            total:updates.length
+        });
+
+
     });
+
+
+});
+app.post('/api/reset-cluster', async(req,res)=>{
+
+    const {error}=await supabase
+    .from('customers')
+    .update({
+        cluster:null
+    })
+    .not('ID','is',null);
+
+
+    if(error)
+        return res.status(500).json(error);
+
+
+    res.json({
+        message:"reset"
+    });
+
 });
 
 // WAJIB ADA INI AGAR VERCEL BISA MENJALANKANNYA
