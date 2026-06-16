@@ -1,9 +1,10 @@
 /* eslint-disable no-undef */
-require('dotenv').config(); // Load environment variables dari .env
-const express = require('express');
-const cors = require('cors');
-const kmeans = require('node-kmeans');
-const { createClient } = require('@supabase/supabase-js');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import cors from 'cors';
+import kmeans from 'node-kmeans';
+import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 app.use(cors());
@@ -16,7 +17,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ================= CRUD API =================
 
-// READ: Ambil semua data (Dibatasi 500 agar browser tidak berat)
+// READ: Ambil semua data
 app.get('/api/customers', async (req, res) => {
     const { data, error } = await supabase
         .from('customers')
@@ -31,7 +32,7 @@ app.get('/api/customers', async (req, res) => {
 // CREATE: Tambah pelanggan
 app.post('/api/customers', async (req, res) => {
     const { income, recency, mnt_wines, mnt_meat } = req.body;
-    const newId = Math.floor(Math.random() * 90000) + 10000; // Generate ID acak untuk data baru
+    const newId = Math.floor(Math.random() * 90000) + 10000; 
     
     const { error } = await supabase
         .from('customers')
@@ -79,7 +80,6 @@ app.delete('/api/customers/:id', async (req, res) => {
 // ================= K-MEANS ALGORITHM =================
 
 app.post('/api/run-kmeans', async (req, res) => {
-    // Ambil semua data untuk diproses
     const { data, error } = await supabase
         .from('customers')
         .select('*');
@@ -87,7 +87,6 @@ app.post('/api/run-kmeans', async (req, res) => {
     if (error) return res.status(500).json(error);
     if (!data || data.length < 3) return res.status(400).json({ message: 'Minimal butuh 3 data untuk K-Means' });
 
-    // Siapkan array data K-Means menggunakan huruf BESAR (sesuai nama kolom CSV/Database)
     let vectors = data.map(item => [
         parseFloat(item.Income) || 0,
         parseFloat(item.Recency) || 0,
@@ -104,7 +103,6 @@ app.post('/api/run-kmeans', async (req, res) => {
             clusterObj.clusterInd.forEach(dataIndex => {
                 const customerId = data[dataIndex].ID; 
                 
-                // Masukkan query update Supabase ke dalam array Promise
                 const updateQuery = supabase
                     .from('customers')
                     .update({ cluster: clusterIndex })
@@ -114,11 +112,8 @@ app.post('/api/run-kmeans', async (req, res) => {
             });
         });
 
-        // Jalankan semua query update secara bersamaan (parallel)
         try {
             const results = await Promise.all(updatePromises);
-            
-            // Cek jika ada error di salah satu promise
             const errors = results.filter(res => res.error);
             if (errors.length > 0) throw errors[0].error;
 
@@ -128,4 +123,6 @@ app.post('/api/run-kmeans', async (req, res) => {
         }
     });
 });
-module.exports = app;
+
+// Eksport menggunakan gaya ES Modules (Wajib untuk Vercel + type: module)
+export default app;
