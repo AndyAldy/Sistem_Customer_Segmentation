@@ -15,8 +15,17 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.get('/api/customers', async (req, res) => {
-    const { data, error } = await supabase.from('customers').select('*').order('ID', { ascending: false }).limit(500);
-    if (error) return res.status(500).json(error);
+
+    const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('ID', { ascending: false })
+        .limit(5000);
+
+    if (error) {
+        return res.status(500).json(error);
+    }
+
     res.json(data);
 });
 

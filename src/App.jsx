@@ -98,23 +98,89 @@ export default function App() {
     setEditId(cust.ID);
   };
 
-  const runKMeans = async () => {
-    try {
-      await axiosInstance.post(`${API_URL}/run-kmeans`);
-      fetchData();
-      alert("Berhasil! Data pelanggan telah disegmentasi.");
-    } catch (err) {
-      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
-      alert(`Gagal menjalankan K-Means. Alasan: ${errorMessage}`);
-      console.error('K-Means Error:', err.response?.data || err);
-    }
-  };
+const runKMeans = async () => {
+  try {
 
-  const determineCategory = (cust) => {
-    if (cust.cluster === null || cust.cluster === undefined) return 'belum-diolah';
-    // Gunakan peta yang dihasilkan secara dinamis dari algoritma K-Means
-    return clusterMap[cust.cluster] || 'belum-diolah';
-  };
+    setLoading(true);
+
+    await axiosInstance.post(`${API_URL}/run-kmeans`);
+
+    await fetchData();
+
+    alert("Berhasil! Data pelanggan telah disegmentasi.");
+
+  } catch (err) {
+
+    const errorMessage =
+      err.response?.data?.error?.message ||
+      err.response?.data?.message ||
+      err.message;
+
+    alert(`Gagal menjalankan K-Means. Alasan: ${errorMessage}`);
+
+    console.error(
+      'K-Means Error:',
+      err.response?.data || err
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+};
+
+const determineCategory = (cust) => {
+
+    if (
+      cust.cluster === null ||
+      cust.cluster === undefined
+    ) {
+        return 'belum-diolah';
+    }
+
+
+    const clusters = [0,1,2].map(id => {
+
+        const data =
+            customers.filter(
+                item => item.cluster === id
+            );
+
+
+        const total =
+            data.reduce(
+                (sum,item)=>
+                    sum +
+                    Number(item.MntWines || 0) +
+                    Number(item.MntMeatProducts || 0),
+                0
+            );
+
+
+        return {
+            id,
+            avg: data.length
+                ? total / data.length
+                : 0
+        };
+
+    })
+    .sort((a,b)=>b.avg-a.avg);
+
+
+
+    if(clusters[0].id === cust.cluster)
+        return "prioritas";
+
+
+    if(clusters[1].id === cust.cluster)
+        return "reguler";
+
+
+    return "pasif";
+
+};
 
   const getClusterBadge = (cust) => {
     const category = determineCategory(cust);
@@ -270,7 +336,10 @@ export default function App() {
                            🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
                         </td>
                         <td className="py-4 px-2">
-                          {cust.cluster !== null ? (
+                          {
+                          cust.cluster !== null &&
+                          cust.cluster !== undefined
+                          ? (
                             <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust)}`}>
                               {getClusterName(cust)}
                             </span>
