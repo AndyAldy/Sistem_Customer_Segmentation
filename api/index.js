@@ -20,7 +20,7 @@ app.get('/api/customers', async (req, res) => {
         .from('customers')
         .select('*')
         .order('ID', { ascending: false })
-        .select('*', { count: 'exact', head: true });
+        .limit(2500);
 
     if (error) {
         return res.status(500).json(error);
@@ -54,7 +54,7 @@ app.post('/api/run-kmeans', async (req, res) => {
 
     const { data, error } = await supabase
         .from('customers')
-        .select('*');
+        .limit(2500);
 
 
     if(error)
