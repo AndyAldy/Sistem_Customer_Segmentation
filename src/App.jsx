@@ -12,8 +12,6 @@ export default function App() {
   const [editId, setEditId] = useState(null);
   
   const [selectedCluster, setSelectedCluster] = useState('all');
-  
-  // Menambahkan state loading (berguna jika backend Render sedang "cold start" / butuh waktu bangun)
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -66,35 +64,50 @@ export default function App() {
       await axiosInstance.post(`${API_URL}/run-kmeans`);
       fetchData();
       alert("Berhasil! Data pelanggan telah disegmentasi.");
-    // eslint-disable-next-line no-unused-vars
     } catch (err) {
-      alert('Gagal menjalankan K-Means.');
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+      alert(`Gagal menjalankan K-Means. Alasan: ${errorMessage}`);
+      console.error('K-Means Error:', err.response?.data || err);
     }
   };
 
-  const getClusterBadge = (cluster) => {
-    if (cluster === 0) return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30';
-    if (cluster === 1) return 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30';
-    if (cluster === 2) return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30';
+  // Menggunakan karakteristik pengeluaran untuk menentukan label yang konsisten
+  const determineCategory = (cust) => {
+    if (cust.cluster === null || cust.cluster === undefined) return 'belum-diolah';
+    
+    const totalPengeluaran = (parseFloat(cust.MntWines) || 0) + (parseFloat(cust.MntMeatProducts) || 0);
+    
+    // Anda bisa menyesuaikan angka batas (threshold) ini jika diperlukan
+    if (totalPengeluaran > 1000) return 'prioritas';
+    if (totalPengeluaran > 300) return 'reguler';
+    return 'pasif';
+  };
+
+  const getClusterBadge = (cust) => {
+    const category = determineCategory(cust);
+    if (category === 'prioritas') return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30';
+    if (category === 'reguler') return 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30';
+    if (category === 'pasif') return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30';
     return 'text-zinc-400 bg-zinc-800 border-zinc-700';
   };
 
-  const getClusterName = (cluster) => {
-    if (cluster === 0) return '💎 Prioritas (High Value)';
-    if (cluster === 1) return '⭐ Reguler (Medium Value)';
-    if (cluster === 2) return '⚠️ Pasif (Low Value)';
+  const getClusterName = (cust) => {
+    const category = determineCategory(cust);
+    if (category === 'prioritas') return '💎 Prioritas (High Value)';
+    if (category === 'reguler') return '⭐ Reguler (Medium Value)';
+    if (category === 'pasif') return '⚠️ Pasif (Low Value)';
     return 'Belum Diolah';
   };
 
   const displayedCustomers = customers.filter(cust => {
     if (selectedCluster === 'all') return true;
-    return cust.cluster === parseInt(selectedCluster);
+    return determineCategory(cust) === selectedCluster;
   });
 
   const getFilterLabel = () => {
-    if (selectedCluster === '0') return '💎 Prioritas';
-    if (selectedCluster === '1') return '⭐ Reguler';
-    if (selectedCluster === '2') return '⚠️ Pasif';
+    if (selectedCluster === 'prioritas') return '💎 Prioritas';
+    if (selectedCluster === 'reguler') return '⭐ Reguler';
+    if (selectedCluster === 'pasif') return '⚠️ Pasif';
     return 'Semua Segmentasi';
   };
 
@@ -162,15 +175,15 @@ export default function App() {
                       <div className={`w-2 h-2 rounded-full ${selectedCluster === 'all' ? 'bg-white' : 'bg-transparent'}`}></div> 
                       Semua Segmentasi
                     </button>
-                    <button onClick={() => setSelectedCluster('0')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '0' ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'}`}>
+                    <button onClick={() => setSelectedCluster('prioritas')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'prioritas' ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
                       💎 Prioritas (High Value)
                     </button>
-                    <button onClick={() => setSelectedCluster('1')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '1' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'}`}>
+                    <button onClick={() => setSelectedCluster('reguler')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'reguler' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
                       ⭐ Reguler (Medium Value)
                     </button>
-                    <button onClick={() => setSelectedCluster('2')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '2' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'}`}>
+                    <button onClick={() => setSelectedCluster('pasif')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'pasif' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
                       ⚠️ Pasif (Low Value)
                     </button>
@@ -224,9 +237,10 @@ export default function App() {
                            🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
                         </td>
                         <td className="py-4 px-2">
+                          {/* Meneruskan 'cust' utuh ke fungsi getClusterBadge & getClusterName */}
                           {cust.cluster !== null ? (
-                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust.cluster)}`}>
-                              {getClusterName(cust.cluster)}
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust)}`}>
+                              {getClusterName(cust)}
                             </span>
                           ) : (
                             <span className="text-zinc-600 text-xs italic bg-zinc-800 px-3 py-1 rounded-full">Belum Diolah</span>
