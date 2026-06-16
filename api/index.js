@@ -124,20 +124,30 @@ app.post('/api/run-kmeans', async (req, res) => {
 
 
 
-        const {error:updateError} =
-        await supabase
+let updateError = null;
+
+
+for (const item of updates) {
+
+    const { error } = await supabase
         .from('customers')
-        .upsert(updates,{
-            onConflict:'ID'
-        });
+        .update({
+            cluster: item.cluster
+        })
+        .eq('ID', item.ID);
 
 
+    if(error){
+        updateError = error;
+        break;
+    }
 
-        if(updateError)
-            return res.status(500).json(updateError);
+}
 
 
-
+if(updateError){
+    return res.status(500).json(updateError);
+}
         res.json({
             message:"KMeans selesai",
             total:updates.length
