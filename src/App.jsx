@@ -13,6 +13,9 @@ export default function App() {
   
   const [selectedCluster, setSelectedCluster] = useState('all');
   const [loading, setLoading] = useState(true);
+  
+  // STATE BARU: Menyimpan peta klaster hasil analisis
+  const [clusterMap, setClusterMap] = useState({}); 
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -28,6 +31,41 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // =========================================================================
+  // LOGIKA CERDAS: Menganalisis output K-Means untuk mencari tahu makna klaster 0, 1, 2
+  // =========================================================================
+  useEffect(() => {
+    if (customers.length === 0) return;
+
+    const stats = { 0: { total: 0, count: 0 }, 1: { total: 0, count: 0 }, 2: { total: 0, count: 0 } };
+
+    // 1. Hitung total uang yang dihabiskan oleh masing-masing klaster K-Means
+    customers.forEach(cust => {
+      if (cust.cluster !== null && cust.cluster !== undefined && stats[cust.cluster]) {
+        const spend = (parseFloat(cust.MntWines) || 0) + (parseFloat(cust.MntMeatProducts) || 0);
+        stats[cust.cluster].total += spend;
+        stats[cust.cluster].count += 1;
+      }
+    });
+
+    // 2. Hitung nilai rata-rata dari setiap klaster
+    const averages = [0, 1, 2].map(id => ({
+      id: id,
+      avg: stats[id].count > 0 ? stats[id].total / stats[id].count : 0
+    }));
+
+    // 3. Urutkan klaster dari yang rata-rata belanjanya paling Sultan (Tertinggi) ke Termiskin
+    averages.sort((a, b) => b.avg - a.avg);
+
+    // 4. Tetapkan status otomatis berdasarkan peringkat hasil hitungan K-Means
+    const mapping = {};
+    if (averages[0]) mapping[averages[0].id] = 'prioritas'; // Peringkat 1
+    if (averages[1]) mapping[averages[1].id] = 'reguler';   // Peringkat 2
+    if (averages[2]) mapping[averages[2].id] = 'pasif';     // Peringkat 3
+
+    setClusterMap(mapping);
+  }, [customers]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -71,16 +109,10 @@ export default function App() {
     }
   };
 
-  // Menggunakan karakteristik pengeluaran untuk menentukan label yang konsisten
   const determineCategory = (cust) => {
     if (cust.cluster === null || cust.cluster === undefined) return 'belum-diolah';
-    
-    const totalPengeluaran = (parseFloat(cust.MntWines) || 0) + (parseFloat(cust.MntMeatProducts) || 0);
-    
-    // Anda bisa menyesuaikan angka batas (threshold) ini jika diperlukan
-    if (totalPengeluaran > 1000) return 'prioritas';
-    if (totalPengeluaran > 300) return 'reguler';
-    return 'pasif';
+    // Gunakan peta yang dihasilkan secara dinamis dari algoritma K-Means
+    return clusterMap[cust.cluster] || 'belum-diolah';
   };
 
   const getClusterBadge = (cust) => {
@@ -99,7 +131,7 @@ export default function App() {
     return 'Belum Diolah';
   };
 
-const displayedCustomers = customers.filter(cust => {
+  const displayedCustomers = customers.filter(cust => {
     if (selectedCluster === 'all') return true;
     return determineCategory(cust) === selectedCluster;
   });
@@ -237,7 +269,6 @@ const displayedCustomers = customers.filter(cust => {
                            🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
                         </td>
                         <td className="py-4 px-2">
-                          {/* Meneruskan 'cust' utuh ke fungsi getClusterBadge & getClusterName */}
                           {cust.cluster !== null ? (
                             <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust)}`}>
                               {getClusterName(cust)}
