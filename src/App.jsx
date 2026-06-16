@@ -1,9 +1,13 @@
 // eslint-disable-next-line no-unused-vars
 import React, { useState, useEffect, useCallback } from 'react';
 import axiosInstance from 'axios';
-import { Play, Plus, Edit3, Trash2, Disc, User, Activity, Filter, ChevronDown } from 'lucide-react';
+import { Play, Plus, Edit3, Trash2, Disc, User, Activity, Filter, ChevronDown, Loader2 } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+// Menggunakan Environment Variable dari Vite/Vercel. 
+// Jika di lokal tidak ada .env, akan fallback ke localhost.
+const API_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api` 
+  : 'http://localhost:5000/api';
 
 export default function App() {
   const [customers, setCustomers] = useState([]);
@@ -12,13 +16,19 @@ export default function App() {
   const [editId, setEditId] = useState(null);
   
   const [selectedCluster, setSelectedCluster] = useState('all');
+  
+  // Menambahkan state loading (berguna jika backend Render sedang "cold start" / butuh waktu bangun)
+  const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await axiosInstance.get(`${API_URL}/customers`);
       setCustomers(res.data);
     } catch (err) {
-      console.error(err);
+      console.error("Gagal mengambil data:", err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -59,7 +69,7 @@ export default function App() {
     try {
       await axiosInstance.post(`${API_URL}/run-kmeans`);
       fetchData();
-      alert("Berhasil! Data pelanggan telah disegmentasi berdasarkan CSV.");
+      alert("Berhasil! Data pelanggan telah disegmentasi.");
     // eslint-disable-next-line no-unused-vars
     } catch (err) {
       alert('Gagal menjalankan K-Means.');
@@ -73,7 +83,6 @@ export default function App() {
     return 'text-zinc-400 bg-zinc-800 border-zinc-700';
   };
 
-  // FUNGSI BARU: Menentukan nama spesifik untuk masing-masing klaster di tabel
   const getClusterName = (cluster) => {
     if (cluster === 0) return '💎 Prioritas (High Value)';
     if (cluster === 1) return '⭐ Reguler (Medium Value)';
@@ -86,7 +95,6 @@ export default function App() {
     return cust.cluster === parseInt(selectedCluster);
   });
 
-  // MENYESUAIKAN LABEL FILTER DENGAN NAMA SPESIFIK
   const getFilterLabel = () => {
     if (selectedCluster === '0') return '💎 Prioritas';
     if (selectedCluster === '1') return '⭐ Reguler';
@@ -154,55 +162,22 @@ export default function App() {
 
                 <div className="absolute right-0 top-full mt-2 w-60 bg-[#1a1a1a] border border-zinc-800/80 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 translate-y-2 transition-all duration-300 overflow-hidden backdrop-blur-xl">
                   <div className="p-1.5 flex flex-col gap-1">
-                    
-                    <button 
-                      onClick={() => setSelectedCluster('all')}
-                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
-                        selectedCluster === 'all' 
-                          ? 'bg-zinc-800 text-white' 
-                          : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-                      }`}
-                    >
+                    <button onClick={() => setSelectedCluster('all')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}>
                       <div className={`w-2 h-2 rounded-full ${selectedCluster === 'all' ? 'bg-white' : 'bg-transparent'}`}></div> 
                       Semua Segmentasi
                     </button>
-
-                    <button 
-                      onClick={() => setSelectedCluster('0')}
-                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
-                        selectedCluster === '0' 
-                          ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' 
-                          : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'
-                      }`}
-                    >
+                    <button onClick={() => setSelectedCluster('0')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '0' ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
                       💎 Prioritas (High Value)
                     </button>
-
-                    <button 
-                      onClick={() => setSelectedCluster('1')}
-                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
-                        selectedCluster === '1' 
-                          ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
-                          : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'
-                      }`}
-                    >
+                    <button onClick={() => setSelectedCluster('1')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '1' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
                       ⭐ Reguler (Medium Value)
                     </button>
-
-                    <button 
-                      onClick={() => setSelectedCluster('2')}
-                      className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${
-                        selectedCluster === '2' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                          : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'
-                      }`}
-                    >
+                    <button onClick={() => setSelectedCluster('2')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === '2' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'}`}>
                       <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
                       ⚠️ Pasif (Low Value)
                     </button>
-
                   </div>
                 </div>
               </div>
@@ -221,46 +196,56 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
-                  {displayedCustomers.map((cust, index) => (
-                    <tr key={cust.ID} className="hover:bg-zinc-800/40 transition-colors group">
-                      <td className="py-4 px-2 text-zinc-500 font-mono text-xs">{index + 1}</td>
-                      <td className="py-4 px-2 font-semibold text-zinc-200 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0">
-                          <User size={16} className="text-zinc-400" />
+                  {loading ? (
+                    <tr>
+                      <td colSpan="6" className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center text-zinc-500">
+                          <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500 mb-3" />
+                          <p>Sedang menghubungkan ke database...</p>
                         </div>
-                        ID #{cust.ID}
-                      </td>
-                      <td className="py-4 px-2 text-zinc-400">
-                        <span className="text-zinc-100 font-medium">${cust.Income || 0}</span> <span className="text-zinc-600 mx-1">/</span> {cust.Recency || 0} hari
-                      </td>
-                      <td className="py-4 px-2 text-zinc-400">
-                         🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
-                      </td>
-                      <td className="py-4 px-2">
-                        {cust.cluster !== null ? (
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust.cluster)}`}>
-                            {getClusterName(cust.cluster)}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-600 text-xs italic bg-zinc-800 px-3 py-1 rounded-full">Belum Diolah</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEdit(cust)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
-                          <Edit3 size={18} />
-                        </button>
-                        <button onClick={() => handleDelete(cust.ID)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
-                          <Trash2 size={18} />
-                        </button>
                       </td>
                     </tr>
-                  ))}
-                  {displayedCustomers.length === 0 && (
+                  ) : displayedCustomers.length === 0 ? (
                     <tr>
                       <td colSpan="6" className="py-12 text-center text-zinc-500 italic">
-                        Tidak ada data di klaster ini.
+                        Tidak ada data yang ditemukan.
                       </td>
                     </tr>
+                  ) : (
+                    displayedCustomers.map((cust, index) => (
+                      <tr key={cust.ID} className="hover:bg-zinc-800/40 transition-colors group">
+                        <td className="py-4 px-2 text-zinc-500 font-mono text-xs">{index + 1}</td>
+                        <td className="py-4 px-2 font-semibold text-zinc-200 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0">
+                            <User size={16} className="text-zinc-400" />
+                          </div>
+                          ID #{cust.ID}
+                        </td>
+                        <td className="py-4 px-2 text-zinc-400">
+                          <span className="text-zinc-100 font-medium">${cust.Income || 0}</span> <span className="text-zinc-600 mx-1">/</span> {cust.Recency || 0} hari
+                        </td>
+                        <td className="py-4 px-2 text-zinc-400">
+                           🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
+                        </td>
+                        <td className="py-4 px-2">
+                          {cust.cluster !== null ? (
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust.cluster)}`}>
+                              {getClusterName(cust.cluster)}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-600 text-xs italic bg-zinc-800 px-3 py-1 rounded-full">Belum Diolah</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEdit(cust)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
+                            <Edit3 size={18} />
+                          </button>
+                          <button onClick={() => handleDelete(cust.ID)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
