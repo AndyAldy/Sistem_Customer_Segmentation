@@ -46,7 +46,7 @@ app.post('/api/run-kmeans', async (req, res) => {
     const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .limit(1000);
+        .limit(5000);
 
     if (error) return res.status(500).json(error);
     if (!data || data.length < 3) return res.status(400).json({ message: 'Minimal butuh 3 data untuk K-Means' });
