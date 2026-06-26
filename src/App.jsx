@@ -3,21 +3,30 @@
 // eslint-disable-next-line no-unused-vars
 import React, { useState, useEffect, useCallback } from 'react';
 import axiosInstance from 'axios';
-import { Play, Plus, Edit3, Trash2, Disc, User, Activity, Filter, ChevronDown, Loader2 } from 'lucide-react';
+import {
+  Play, Plus, Edit3, Trash2, Disc, User, Activity, Filter, ChevronDown, Loader2, Sparkles,
+} from 'lucide-react';
 
 const API_URL = '/api';
 
+const EMPTY_FORM = {
+  age: '', education: 'Postgraduate', marital_status: 'In couple', income: '', spending: '',
+  seniority: '', has_child: 'No child', children: 'No child', wines: '', fruits: '', meat: '',
+  fish: '', sweets: '', gold: '',
+};
+
 export default function App() {
   const [customers, setCustomers] = useState([]);
-  const [formData, setFormData] = useState({ income: '', recency: '', mnt_wines: '', mnt_meat: '' });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-  
+
   const [selectedCluster, setSelectedCluster] = useState('all');
   const [loading, setLoading] = useState(true);
-  
-  // STATE BARU: Menyimpan peta klaster hasil analisis
-  const [clusterMap, setClusterMap] = useState({}); 
+  const [seeding, setSeeding] = useState(false);
+
+  // Hasil terakhir dari /api/run-kmeans: { best_k, chart_data, insights }
+  const [result, setResult] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -25,7 +34,7 @@ export default function App() {
       const res = await axiosInstance.get(`${API_URL}/customers`);
       setCustomers(res.data);
     } catch (err) {
-      console.error("Gagal mengambil data:", err);
+      console.error('Gagal mengambil data:', err);
     } finally {
       setLoading(false);
     }
@@ -33,41 +42,6 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  // =========================================================================
-  // LOGIKA CERDAS: Menganalisis output K-Means untuk mencari tahu makna klaster 0, 1, 2
-  // =========================================================================
-  useEffect(() => {
-    if (customers.length === 0) return;
-
-    const stats = { 0: { total: 0, count: 0 }, 1: { total: 0, count: 0 }, 2: { total: 0, count: 0 } };
-
-    // 1. Hitung total uang yang dihabiskan oleh masing-masing klaster K-Means
-    customers.forEach(cust => {
-      if (cust.cluster !== null && cust.cluster !== undefined && stats[cust.cluster]) {
-        const spend = (parseFloat(cust.MntWines) || 0) + (parseFloat(cust.MntMeatProducts) || 0);
-        stats[cust.cluster].total += spend;
-        stats[cust.cluster].count += 1;
-      }
-    });
-
-    // 2. Hitung nilai rata-rata dari setiap klaster
-    const averages = [0, 1, 2].map(id => ({
-      id: id,
-      avg: stats[id].count > 0 ? stats[id].total / stats[id].count : 0
-    }));
-
-    // 3. Urutkan klaster dari yang rata-rata belanjanya paling Sultan (Tertinggi) ke Termiskin
-    averages.sort((a, b) => b.avg - a.avg);
-
-    // 4. Tetapkan status otomatis berdasarkan peringkat hasil hitungan K-Means
-    const mapping = {};
-    if (averages[0]) mapping[averages[0].id] = 'prioritas'; // Peringkat 1
-    if (averages[1]) mapping[averages[1].id] = 'reguler';   // Peringkat 2
-    if (averages[2]) mapping[averages[2].id] = 'pasif';     // Peringkat 3
-
-    setClusterMap(mapping);
-  }, [customers]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -80,7 +54,7 @@ export default function App() {
     } else {
       await axiosInstance.post(`${API_URL}/customers`, formData);
     }
-    setFormData({ income: '', recency: '', mnt_wines: '', mnt_meat: '' });
+    setFormData(EMPTY_FORM);
     setIsEditing(false);
     setEditId(null);
     fetchData();
@@ -94,122 +68,67 @@ export default function App() {
   };
 
   const handleEdit = (cust) => {
-    setFormData({ income: cust.Income, recency: cust.Recency, mnt_wines: cust.MntWines, mnt_meat: cust.MntMeatProducts });
+    setFormData({
+      age: cust.Age, education: cust.Education, marital_status: cust.Marital_Status,
+      income: cust.Income, spending: cust.Spending, seniority: cust.Seniority,
+      has_child: cust.Has_child, children: cust.Children, wines: cust.Wines,
+      fruits: cust.Fruits, meat: cust.Meat, fish: cust.Fish, sweets: cust.Sweets, gold: cust.Gold,
+    });
     setIsEditing(true);
     setEditId(cust.ID);
   };
 
-const runKMeans = async () => {
-  try {
-
-    setLoading(true);
-
-    await axiosInstance.post(`${API_URL}/run-kmeans`);
-
-    await fetchData();
-
-    alert("Berhasil! Data pelanggan telah disegmentasi.");
-
-  } catch (err) {
-
-    const errorMessage =
-      err.response?.data?.error?.message ||
-      err.response?.data?.message ||
-      err.message;
-
-    alert(`Gagal menjalankan K-Means. Alasan: ${errorMessage}`);
-
-    console.error(
-      'K-Means Error:',
-      err.response?.data || err
-    );
-
-  } finally {
-
-    setLoading(false);
-
-  }
-};
-
-const determineCategory = (cust) => {
-
-    if (
-      cust.cluster === null ||
-      cust.cluster === undefined
-    ) {
-        return 'belum-diolah';
+  // Mengisi database dari marketing_campaign.csv (raw dataset) — feature
+  // engineering dilakukan di backend (api/features.js), setara Cell 2-4 notebook.
+  const handleSeed = async () => {
+    try {
+      setSeeding(true);
+      const res = await axiosInstance.post(`${API_URL}/seed`);
+      alert(`Seed berhasil: ${res.data.jumlah_disimpan} baris disimpan (${res.data.sebelum_cleaning} → ${res.data.setelah_cleaning} setelah cleaning).`);
+      await fetchData();
+    } catch (err) {
+      alert(`Gagal seed data: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setSeeding(false);
     }
-
-
-    const clusters = [0,1,2].map(id => {
-
-        const data =
-            customers.filter(
-                item => item.cluster === id
-            );
-
-
-        const total =
-            data.reduce(
-                (sum,item)=>
-                    sum +
-                    Number(item.MntWines || 0) +
-                    Number(item.MntMeatProducts || 0),
-                0
-            );
-
-
-        return {
-            id,
-            avg: data.length
-                ? total / data.length
-                : 0
-        };
-
-    })
-    .sort((a,b)=>b.avg-a.avg);
-
-
-
-    if(clusters[0].id === cust.cluster)
-        return "prioritas";
-
-
-    if(clusters[1].id === cust.cluster)
-        return "reguler";
-
-
-    return "pasif";
-
-};
-
-  const getClusterBadge = (cust) => {
-    const category = determineCategory(cust);
-    if (category === 'prioritas') return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30';
-    if (category === 'reguler') return 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30';
-    if (category === 'pasif') return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30';
-    return 'text-zinc-400 bg-zinc-800 border-zinc-700';
   };
 
-  const getClusterName = (cust) => {
-    const category = determineCategory(cust);
-    if (category === 'prioritas') return '💎 Prioritas (High Value)';
-    if (category === 'reguler') return '⭐ Reguler (Medium Value)';
-    if (category === 'pasif') return '⚠️ Pasif (Low Value)';
-    return 'Belum Diolah';
+  const runKMeans = async () => {
+    try {
+      setLoading(true);
+      const res = await axiosInstance.post(`${API_URL}/run-kmeans`);
+      setResult(res.data);
+      await fetchData();
+      alert(`Berhasil! K optimal = ${res.data.best_k}. Data pelanggan telah disegmentasi.`);
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message;
+      alert(`Gagal menjalankan K-Means. Alasan: ${errorMessage}`);
+      console.error('K-Means Error:', err.response?.data || err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const displayedCustomers = customers.filter(cust => {
+  const getClusterBadge = (clusterId) => {
+    const palette = [
+      'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30',
+      'text-cyan-300 bg-cyan-500/20 border-cyan-500/30',
+      'text-emerald-300 bg-emerald-500/20 border-emerald-500/30',
+      'text-amber-300 bg-amber-500/20 border-amber-500/30',
+      'text-violet-300 bg-violet-500/20 border-violet-500/30',
+      'text-rose-300 bg-rose-500/20 border-rose-500/30',
+    ];
+    return palette[clusterId % palette.length];
+  };
+
+  const displayedCustomers = customers.filter((cust) => {
     if (selectedCluster === 'all') return true;
-    return determineCategory(cust) === selectedCluster;
+    return String(cust.cluster) === String(selectedCluster);
   });
 
-  const getFilterLabel = () => {
-    if (selectedCluster === 'prioritas') return '💎 Prioritas';
-    if (selectedCluster === 'reguler') return '⭐ Reguler';
-    if (selectedCluster === 'pasif') return '⚠️ Pasif';
-    return 'Semua Segmentasi';
-  };
+  const availableClusters = result
+    ? Array.from({ length: result.best_k }, (_, i) => i)
+    : [...new Set(customers.map((c) => c.cluster).filter((c) => c !== null && c !== undefined))];
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-fuchsia-500/30 text-left">
@@ -229,7 +148,7 @@ const determineCategory = (cust) => {
               Segmentasi Pelanggan
             </h1>
             <p className="text-zinc-400 text-sm md:text-base max-w-2xl font-light leading-relaxed">
-              Model Machine Learning menggunakan Algoritma K-Means Clustering untuk membedah perilaku pembelian berdasarkan pendapatan dan pengeluaran.
+              K-Means Clustering dengan pemilihan K otomatis (Elbow + Silhouette Score) berdasarkan Age, Income, Spending, Seniority, dan rincian kategori belanja.
             </p>
           </div>
         </div>
@@ -237,7 +156,7 @@ const determineCategory = (cust) => {
 
       <div className="px-6 md:px-16 pb-24 pt-4 max-w-7xl mx-auto">
 
-        <div className="flex items-center gap-5 py-6 mb-4">
+        <div className="flex flex-wrap items-center gap-5 py-6 mb-4">
           <button
             onClick={runKMeans}
             className="w-16 h-16 cursor-pointer hover:cursor-pointer active:cursor-grabbing bg-fuchsia-500 hover:bg-fuchsia-400 hover:scale-105 active:scale-95 transition-all rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(217,70,239,0.4)] text-black"
@@ -246,47 +165,75 @@ const determineCategory = (cust) => {
             <Play size={32} className="ml-1" fill="currentColor" />
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">Proses Data</h3>
-            <p className="text-sm text-zinc-500 font-medium">Klik untuk memproses dataset CSV</p>
+            <h3 className="text-xl font-bold text-white">Jalankan Analisis</h3>
+            <p className="text-sm text-zinc-500 font-medium">K optimal dicari otomatis (Elbow Method)</p>
           </div>
+
+          <button
+            onClick={handleSeed}
+            disabled={seeding}
+            className="ml-auto cursor-pointer flex items-center gap-2 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md disabled:opacity-50"
+            title="Muat ulang dataset dari marketing_campaign.csv"
+          >
+            {seeding ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="text-fuchsia-400" />}
+            {seeding ? 'Memuat dataset...' : 'Seed dari CSV'}
+          </button>
         </div>
+
+        {/* PANEL HASIL ANALISIS (Elbow, Silhouette, Insight Bisnis) */}
+        {result && (
+          <div className="mb-8 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-100">
+              <Sparkles className="text-fuchsia-400" size={20} /> Hasil Analisis K-Means
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <Stat label="K Optimal (Elbow)" value={result.best_k} />
+              <Stat label="K Terbaik (Silhouette)" value={result.chart_data.silhouette_k} />
+              <Stat label="Silhouette Score" value={result.insights.silhouette_score.toFixed(3)} />
+              <Stat label="Total Pelanggan" value={result.total} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(result.insights.clusters).map(([name, c]) => (
+                <div key={name} className={`rounded-xl border p-4 ${getClusterBadge(Number(name.split(' ')[1]))}`}>
+                  <p className="font-bold text-sm mb-1">{name} — {c.jumlah_pelanggan.toLocaleString()} pelanggan ({c.persen}%)</p>
+                  <p className="text-xs opacity-80 mb-2">
+                    Income {c.income_level} (${c.rata_income.toLocaleString()}) · Spending {c.spending_level} (${c.rata_spending.toLocaleString()}) · {c.seniority_level} ({c.rata_seniority} bln) · usia {c.rata_age}
+                  </p>
+                  <p className="text-xs font-medium">{c.strategi}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
           {/* TABEL DATA */}
           <div className="lg:col-span-8 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl p-6 shadow-2xl">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-zinc-800/80 pb-4">
               <h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100">
                 <Disc className="text-cyan-400" size={20} /> Dataset Pelanggan
               </h2>
-              
-              {/* DROPDOWN MENU */}
+
               <div className="relative group z-30">
                 <button className="flex items-center gap-2 cursor-pointer hover:cursor-grab active:cursor-grabbing bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md">
                   <Filter size={16} className="text-zinc-400" />
-                  {getFilterLabel()}
+                  {selectedCluster === 'all' ? 'Semua Segmentasi' : `Cluster ${selectedCluster}`}
                   <ChevronDown size={16} className="text-zinc-500 group-hover:rotate-180 transition-transform duration-300 ml-1" />
                 </button>
 
                 <div className="absolute right-0 top-full mt-2 w-60 bg-[#1a1a1a] border border-zinc-800/80 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 translate-y-2 transition-all duration-300 overflow-hidden backdrop-blur-xl">
                   <div className="p-1.5 flex flex-col gap-1">
-                    <button onClick={() => setSelectedCluster('all')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}>
-                      <div className={`w-2 h-2 rounded-full ${selectedCluster === 'all' ? 'bg-white' : 'bg-transparent'}`}></div> 
+                    <button onClick={() => setSelectedCluster('all')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer ${selectedCluster === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}>
                       Semua Segmentasi
                     </button>
-                    <button onClick={() => setSelectedCluster('prioritas')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'prioritas' ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20' : 'text-zinc-400 hover:bg-fuchsia-500/10 hover:text-fuchsia-400'}`}>
-                      <div className="w-2 h-2 rounded-full bg-fuchsia-500 shadow-[0_0_8px_rgba(217,70,239,0.8)]"></div> 
-                      💎 Prioritas (High Value)
-                    </button>
-                    <button onClick={() => setSelectedCluster('reguler')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'reguler' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-zinc-400 hover:bg-cyan-500/10 hover:text-cyan-400'}`}>
-                      <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div> 
-                      ⭐ Reguler (Medium Value)
-                    </button>
-                    <button onClick={() => setSelectedCluster('pasif')} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer hover:cursor-pointer ${selectedCluster === 'pasif' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400'}`}>
-                      <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> 
-                      ⚠️ Pasif (Low Value)
-                    </button>
+                    {availableClusters.map((id) => (
+                      <button key={id} onClick={() => setSelectedCluster(String(id))} className={`text-left px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer ${String(selectedCluster) === String(id) ? getClusterBadge(id) : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}>
+                        Cluster {id}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -298,16 +245,17 @@ const determineCategory = (cust) => {
                   <tr>
                     <th className="pb-4 px-2 font-medium">#</th>
                     <th className="pb-4 px-2 font-medium">Pelanggan</th>
-                    <th className="pb-4 px-2 font-medium">Income & Recency</th>
-                    <th className="pb-4 px-2 font-medium">Pengeluaran</th>
-                    <th className="pb-4 px-2 font-medium">Segmentasi Spesifik</th>
+                    <th className="pb-4 px-2 font-medium">Profil</th>
+                    <th className="pb-4 px-2 font-medium">Income & Spending</th>
+                    <th className="pb-4 px-2 font-medium">Rincian Belanja</th>
+                    <th className="pb-4 px-2 font-medium">Cluster</th>
                     <th className="pb-4 px-2 font-medium text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
                   {loading ? (
                     <tr>
-                      <td colSpan="6" className="py-16 text-center">
+                      <td colSpan="7" className="py-16 text-center">
                         <div className="flex flex-col items-center justify-center text-zinc-500">
                           <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500 mb-3" />
                           <p>Sedang menghubungkan ke database...</p>
@@ -316,8 +264,8 @@ const determineCategory = (cust) => {
                     </tr>
                   ) : displayedCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="py-12 text-center text-zinc-500 italic">
-                        Tidak ada data yang ditemukan.
+                      <td colSpan="7" className="py-12 text-center text-zinc-500 italic">
+                        Tidak ada data. Klik &quot;Seed dari CSV&quot; untuk memuat dataset.
                       </td>
                     </tr>
                   ) : (
@@ -330,29 +278,30 @@ const determineCategory = (cust) => {
                           </div>
                           ID #{cust.ID}
                         </td>
-                        <td className="py-4 px-2 text-zinc-400">
-                          <span className="text-zinc-100 font-medium">${cust.Income || 0}</span> <span className="text-zinc-600 mx-1">/</span> {cust.Recency || 0} hari
+                        <td className="py-4 px-2 text-zinc-400 text-xs">
+                          {cust.Age} thn · {cust.Education} <br />
+                          {cust.Marital_Status} · {cust.Children}
                         </td>
                         <td className="py-4 px-2 text-zinc-400">
-                           🍷 <span className="text-zinc-100">${cust.MntWines || 0}</span> <span className="text-zinc-600 mx-1">|</span> 🥩 <span className="text-zinc-100">${cust.MntMeatProducts || 0}</span>
+                          <span className="text-zinc-100 font-medium">${cust.Income || 0}</span> <span className="text-zinc-600 mx-1">/</span> ${cust.Spending || 0}
+                        </td>
+                        <td className="py-4 px-2 text-zinc-400 text-xs">
+                          🍷{cust.Wines || 0} 🍎{cust.Fruits || 0} 🥩{cust.Meat || 0} 🐟{cust.Fish || 0} 🍬{cust.Sweets || 0} 🥇{cust.Gold || 0}
                         </td>
                         <td className="py-4 px-2">
-                          {
-                          cust.cluster !== null &&
-                          cust.cluster !== undefined
-                          ? (
-                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust)}`}>
-                              {getClusterName(cust)}
+                          {cust.cluster !== null && cust.cluster !== undefined ? (
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getClusterBadge(cust.cluster)}`}>
+                              Cluster {cust.cluster}
                             </span>
                           ) : (
                             <span className="text-zinc-600 text-xs italic bg-zinc-800 px-3 py-1 rounded-full">Belum Diolah</span>
                           )}
                         </td>
                         <td className="py-4 px-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(cust)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
+                          <button onClick={() => handleEdit(cust)} className="p-2 cursor-pointer text-zinc-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg transition-colors">
                             <Edit3 size={18} />
                           </button>
-                          <button onClick={() => handleDelete(cust.ID)} className="p-2 cursor-pointer hover:cursor-pointer active:cursor-grabbing text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
+                          <button onClick={() => handleDelete(cust.ID)} className="p-2 cursor-pointer text-zinc-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors">
                             <Trash2 size={18} />
                           </button>
                         </td>
@@ -370,38 +319,38 @@ const determineCategory = (cust) => {
               <h2 className="text-lg font-bold mb-6 flex items-center gap-2 border-b border-zinc-800/80 pb-4 text-zinc-100">
                 <Plus className="text-fuchsia-400" size={20} /> {isEditing ? 'Edit Data Pelanggan' : 'Tambah Baru'}
               </h2>
-              <form onSubmit={handleSave} className="space-y-5">
+              <form onSubmit={handleSave} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Pendapatan ($)</label>
-                    <input type="number" name="income" value={formData.income} onChange={handleChange} required
-                      className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-fuchsia-500 transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Recency (Hari)</label>
-                    <input type="number" name="recency" value={formData.recency} onChange={handleChange} required
-                      className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-fuchsia-500 transition-all" />
-                  </div>
+                  <Field label="Usia" name="age" value={formData.age} onChange={handleChange} type="number" />
+                  <SelectField label="Pendidikan" name="education" value={formData.education} onChange={handleChange}
+                    options={['Undergraduate', 'Postgraduate']} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Wine ($)</label>
-                    <input type="number" name="mnt_wines" value={formData.mnt_wines} onChange={handleChange} required
-                      className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Daging ($)</label>
-                    <input type="number" name="mnt_meat" value={formData.mnt_meat} onChange={handleChange} required
-                      className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-all" />
-                  </div>
+                  <SelectField label="Status" name="marital_status" value={formData.marital_status} onChange={handleChange}
+                    options={['Alone', 'In couple']} />
+                  <SelectField label="Anak" name="children" value={formData.children} onChange={handleChange}
+                    options={['No child', '1 child', '2 children', '3 children']} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Income ($)" name="income" value={formData.income} onChange={handleChange} type="number" />
+                  <Field label="Spending ($)" name="spending" value={formData.spending} onChange={handleChange} type="number" />
+                </div>
+                <Field label="Seniority (bulan)" name="seniority" value={formData.seniority} onChange={handleChange} type="number" />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Wine" name="wines" value={formData.wines} onChange={handleChange} type="number" small />
+                  <Field label="Fruit" name="fruits" value={formData.fruits} onChange={handleChange} type="number" small />
+                  <Field label="Meat" name="meat" value={formData.meat} onChange={handleChange} type="number" small />
+                  <Field label="Fish" name="fish" value={formData.fish} onChange={handleChange} type="number" small />
+                  <Field label="Sweets" name="sweets" value={formData.sweets} onChange={handleChange} type="number" small />
+                  <Field label="Gold" name="gold" value={formData.gold} onChange={handleChange} type="number" small />
                 </div>
                 <div className="pt-2">
-                  <button type="submit" className="w-full cursor-pointer hover:cursor-pointer active:cursor-grabbing bg-white text-black hover:bg-zinc-200 px-4 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
+                  <button type="submit" className="w-full cursor-pointer bg-white text-black hover:bg-zinc-200 px-4 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-95 shadow-lg">
                     {isEditing ? 'Simpan Perubahan' : 'Tambahkan ke Database'}
                   </button>
                   {isEditing && (
-                    <button type="button" onClick={() => { setIsEditing(false); setFormData({ income: '', recency: '', mnt_wines: '', mnt_meat: '' }) }}
-                      className="w-full cursor-pointer hover:cursor-pointer bg-transparent border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 px-4 py-3 rounded-xl font-semibold transition-all mt-3">
+                    <button type="button" onClick={() => { setIsEditing(false); setFormData(EMPTY_FORM); }}
+                      className="w-full cursor-pointer bg-transparent border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 px-4 py-3 rounded-xl font-semibold transition-all mt-3">
                       Batal
                     </button>
                   )}
@@ -412,6 +361,37 @@ const determineCategory = (cust) => {
 
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4">
+      <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function Field({ label, name, value, onChange, type = 'text', small = false }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">{label}</label>
+      <input type={type} name={name} value={value} onChange={onChange} required
+        className={`w-full bg-zinc-950/50 border border-zinc-800 rounded-xl ${small ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-sm'} text-white focus:outline-none focus:border-fuchsia-500 transition-all`} />
+    </div>
+  );
+}
+
+function SelectField({ label, name, value, onChange, options }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">{label}</label>
+      <select name={name} value={value} onChange={onChange}
+        className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-fuchsia-500 transition-all">
+        {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
     </div>
   );
 }
