@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "marketing_campaign.csv"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
