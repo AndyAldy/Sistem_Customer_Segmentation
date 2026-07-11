@@ -8,6 +8,7 @@ import path from 'path';
 import { parse } from 'csv-parse/sync';
 import mysql from 'mysql2/promise';
 import { createClient } from '@supabase/supabase-js';
+import { fileURLToPath } from 'url'; // <--- Tambahkan ini
 
 import { cleanRawData, buildFeatures } from './features.js';
 import {
@@ -158,8 +159,9 @@ app.delete('/api/customers/:id', async (req, res) => {
 // SEED API
 // ============================================================
 app.post('/api/seed', async (req, res) => {
-  try {
-    const csvPath = path.join(process.cwd(), 'marketing_campaign.csv');
+  try {const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const csvPath = path.join(__dirname, '../marketing_campaign.csv');
     const raw = fs.readFileSync(csvPath, 'utf-8');
 
     const rows = parse(raw, { columns: true, delimiter: '\t', skip_empty_lines: true });
