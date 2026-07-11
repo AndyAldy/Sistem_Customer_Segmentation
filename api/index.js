@@ -180,10 +180,10 @@ const csvPath = path.join(__dirname, '../marketing_campaign.csv');
         if (error) throw error;
         inserted += batch.length;
       }
-    } else {
+} else {
       const records = features.map((f, idx) => [
-        cleaned[idx].ID, f.age, f.education, f.marital_status, f.income, f.spending, 
-        f.seniority, f.has_child, f.children, f.wines, f.fruits, f.meat, f.fish, f.sweets, f.gold
+        cleaned[idx].ID, f.Age, f.Education, f.Marital_Status, f.Income, f.Spending, 
+        f.Seniority, f.Has_child, f.Children, f.Wines, f.Fruits, f.Meat, f.Fish, f.Sweets, f.Gold
       ]);
       const query = `
         INSERT IGNORE INTO customers 
